@@ -513,6 +513,19 @@
 			  </br>ETL (Extract, transform, Load) - <b>Python</b>
 			</div>
 
+      <div class="colonne">
+			  <h3>Nombre de clients dans une boulangerie (Visualisation intéractive)</h3>
+
+        <input type="text" id="amount" style="border: 0; color: #FF0000; font-weight: bold;" size="100" />
+        
+      
+      <div id="slider-range"></div>
+			  <a href="https://observablehq.com/@simon-etu-ucbl" target="_blank"> <div id="number_clients"></div> </a>
+			  </br>Data Visualisation - <b>JavaScript, D3js</b>
+        <a href="https://www.kaggle.com/datasets/akashdeepkuila/bakery" target="_blank"> <h4>lien vers la source des données</h4>  </a>
+
+			</div>
+
 
 		</div>
 		
@@ -742,6 +755,197 @@
 <!-- End Document
 ================================================== -->
 </body>
+
+
+
+
+<!-- Load d3.js -->
+<script src="https://d3js.org/d3.v4.js"></script>
+<script src="https://d3js.org/d3-array.v2.min.js"></script>
+
+
+<!-- Load JQuey (for the double range slider that do not exist in d3.js)-->
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.10.2/themes/smoothness/jquery-ui.css" />
+<script src="https://code.jquery.com/jquery-1.9.1.js"></script>
+<script src="https://code.jquery.com/ui/1.10.2/jquery-ui.js"></script>
+
+<script>
+
+  function BakeryViz1(dataset) {
+
+      var width = document.getElementById("slider-range").clientWidth
+      console.log(width)
+      
+      const margin = ({top: 35, right: 0, bottom: 35, left: 70})
+      const w = width
+      const h = 400
+  
+      var svg = d3.select("#number_clients").append("svg").attr("height", h).attr("width", w)
+  
+        
+        // X label
+        svg.append('text')
+          .attr('x', w/2 - 30)
+          .attr('y', h - margin.bottom +30)
+          .attr('text-anchor', 'middle')
+          .style('font-family', 'Helvetica')
+          .style('font-size', 12)
+          .text('Temps');
+          
+          // Y label
+          svg.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('transform', 'translate(20,' + h/2 + ')rotate(-90)')
+          .style('font-family', 'Helvetica')
+          .style('font-size', 12)
+          .text("Nombre de clients");
+  
+  
+      //console.log(my_map.map(d => d[1].map(j => j)).map(k => k[0].date) )
+      //let test = [my_map.map(d => d[0]), my_map.map(d => d[1].map(j => j)).map(k => k[0].date)]
+      //let test3 = d3.intersection(my_map.map(d => d[1].map(j => j)).map(k => k[0].date))
+      //var myObject = [{ticket:my_map.map(d => d[0]), date:my_map.map(d => d[1].map(j => j)).map(k => k[0].date)}]
+      //const myObject2 = d3.index(my_map, d => d[1].date)
+      //console.log(my_map.map(d => d[1].map(j => j)).map(k => k[0].date))
+  
+  
+  
+      // X axis range init
+      var x = d3.scaleTime().range([margin.left, w - margin.left - margin.right])
+      var xAxis = svg.append("g").attr("transform", `translate(0,${h - margin.bottom})`)
+                      //.domain([d3.min(buckets1.map(d => d.x0)),  d3.max(buckets1.map(d => d.x1))])
+  
+      // Y axis range init
+      var y = d3.scaleLinear().range([h-margin.bottom, 0+margin.top])
+      var yAxis = svg.append("g").attr("transform", `translate(${margin.left},0)`)
+  
+  
+  
+      function update(nbBins, startDate, endDate) {
+          
+          console.log("ici")
+  
+          var essai = d3.scaleTime().domain([startDate, endDate])
+  
+          const binX = d3.bin().domain(essai.domain()).thresholds(essai.ticks(nbBins))
+          const bucketsX = binX(dataset.filter(s => s.date >= startDate && s.date <= endDate).map( d => d.date))
+    
+           
+          x.domain([d3.min(bucketsX.map(d => d.x0)), d3.max(bucketsX.map(d => d.x1))])
+          xAxis.transition()
+               .duration(1000)
+               .call(d3.axisBottom(x))
+  
+          // const bin = d3.bin().domain(x.domain()).thresholds(x.ticks(20));
+          // const buckets_time = bin(dataset.map((d) => d.date));
+  
+          var my_map = d3.groups(dataset, d => d.ticket_number)
+          var bin_for_tickets = d3.bin().domain(x.domain()).thresholds(x.ticks(nbBins));
+          var buckets_nb_tickets = bin_for_tickets(my_map.map(d => d[1].map(j => j)).map(k => k[0].date))
+  
+          console.log(buckets_nb_tickets)
+  
+          // Y axis Update
+          y.domain([0, d3.max(buckets_nb_tickets.map(d => d.length))])
+          yAxis.transition()
+               .duration(1000)
+               .call(d3.axisLeft(y));
+  
+  
+  
+          // Join the rect with the bins data
+          var current_rects = svg.selectAll("rect")
+              .data(buckets_nb_tickets)
+  
+          current_rects.enter()
+              .append("rect") 
+              .merge(current_rects)
+              .transition()
+              .duration(1000)
+              .attr("transform", d => "translate(" + x(d.x0) + "," + y(d.length) + ")" )
+              .attr("width", d => x(d.x1) - x(d.x0) )
+              .attr("height", d => h - y(d.length) - margin.bottom)
+              .style("fill",  "red")
+              .style("opacity", 0.6)
+  
+          // Removing rects not in use
+          current_rects.exit()
+              .remove()
+      }
+  
+  
+      //FIRST INIT
+      let initStartDate = d3.min(dataset.map(d => d.date))
+      let initEndDate = d3.max(dataset.map(d => d.date))
+      update(10, initStartDate, initEndDate)
+  
+      
+      //DYNAMIC
+      // d3.select("#slider-range").on("click", function() {
+      //     //Dates of the slider
+      //     let arr = document.getElementById("amount").value.split(" - ")
+      //     let parseTime = d3.timeParse("%a %b %d %Y");   
+      //     let startDate = parseTime(arr[0])
+      //     let endDate = parseTime(arr[1])
+      //     //console.log(startDate)
+      //     //console.log(endDate)
+      //     update(30, startDate, endDate )
+      // })
+  
+  
+      //DYNAMIC (better with JQuery slider)
+      const minDate = d3.min(dataset.map(d => d.date))
+      const maxDate = d3.max(dataset.map(d => d.date))
+      $("#slider-range").slider({
+                  range: true,
+                  min: new Date(minDate).getTime() / 1000,
+                  max: new Date(maxDate).getTime() / 1000,
+                  step: 86400,
+                  values: [new Date(minDate).getTime() / 1000, new Date(maxDate).getTime() / 1000],
+                  slide: function (event, ui) {
+                      $("#amount").val((new Date(ui.values[0] * 1000).toDateString()) + " - " + (new Date(ui.values[1] * 1000)).toDateString());
+                  },
+                  change: function (event, ui) {
+                      let arr = document.getElementById("amount").value.split(" - ")
+                      let parseTime = d3.timeParse("%a %b %d %Y");   
+                      let startDate = parseTime(arr[0])
+                      let endDate = parseTime(arr[1])
+                      update(30, startDate, endDate )
+                  }
+              })
+              
+      $("#amount").val((new Date($("#slider-range").slider("values", 0) * 1000).toDateString()) +
+          " - " + (new Date($("#slider-range").slider("values", 1) * 1000)).toDateString())            
+      
+  }
+  
+  
+  
+  function conversor(d){
+      const parseTime = d3.timeParse("%Y-%m-%d");
+      d.date = parseTime(d.date)
+      d.unit_price = +d.unit_price
+      d.ticket_number = +d.ticket_number
+      d.quantity = +d.quantity
+      return d;
+  }
+  
+  async function LoadBakeryAndDraw() {
+      d3.csv(
+          "https://simon-klop.github.io/Data-Viz/Bakery_clean.csv",
+          conversor,
+          function(data) {
+              BakeryViz1(data)
+          })
+  }
+  
+  
+  
+  LoadBakeryAndDraw()
+  
+  
+  
+  </script>
 
 
 </html>
